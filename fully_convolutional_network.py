@@ -11,14 +11,14 @@ import numpy as np
 from keras.preprocessing.image import ImageDataGenerator
 from keras.models import Sequential
 from keras.layers import Dense, Flatten
-from keras.layers import Conv2D, MaxPool2D
+from keras.layers import Conv2D, MaxPool2D, BatchNormalization
 from keras.layers import BatchNormalization
 from keras.optimizers import SGD
 from keras.callbacks import ModelCheckpoint, TensorBoard
 
 # unused for now, to be used for ROC analysis
 from sklearn.metrics import roc_curve, auc
-
+import matplotlib.pyplot as plt
 
 # the size of the images in the PCAM dataset
 IMAGE_SIZE = 96
@@ -56,19 +56,24 @@ def get_model(kernel_size=(3,3), pool_size=(4,4), first_filters=64, second_filte
      model = Sequential()
 
      model.add(Conv2D(first_filters, kernel_size, activation = 'relu', padding = 'same', input_shape = (IMAGE_SIZE, IMAGE_SIZE, 3)))
+     model.add(BatchNormalization(axis=-1, momentum=0.99))
      
      model.add(Conv2D(second_filters, kernel_size, activation = 'relu', padding = 'same'))
      model.add(MaxPool2D(pool_size = pool_size)) 
+     model.add(BatchNormalization(axis=-1, momentum=0.99))
      
      model.add(Conv2D(third_filters, kernel_size, activation = 'relu', padding = 'same'))
+     model.add(BatchNormalization(axis=-1, momentum=0.99))
      
      model.add(Conv2D(fourth_filters, kernel_size, activation = 'relu', padding = 'same'))
      model.add(MaxPool2D(pool_size = pool_size))
+     model.add(BatchNormalization(axis=-1, momentum=0.99))
      
      model.add(Conv2D(fifth_filters, kernel_size, activation = 'relu', padding = 'same'))
-
+     model.add(BatchNormalization(axis=-1, momentum=0.99))
+    
      model.add(Conv2D(sixth_filters, kernel_size, activation = 'relu', padding = 'same'))
-	 
+     model.add(BatchNormalization(axis=-1, momentum=0.99))
 
      model.add(Flatten())
      model.add(Dense(1, activation = 'sigmoid'))
@@ -117,7 +122,8 @@ history = model.fit_generator(train_gen, steps_per_epoch=train_steps,
 #%% ROC analysis
 val_gen.reset()
 y_pred = model.predict_generator(val_gen, steps=val_steps, verbose=1)
-y_pred = np.rint(y_pred)
+
+#y_pred_rounded = np.rint(y_pred)
 
 #y_true = np.append(np.zeros((int(val_gen.n/2),1)), np.ones((int(val_gen.n/2),1)), axis=0)
 y_true = val_gen.classes
@@ -125,4 +131,14 @@ y_true = val_gen.classes
 fpr, tpr, thresholds = roc_curve(y_true, y_pred)
 auc_metric = auc(fpr, tpr)
 print("AUC of model: "+str(auc_metric))
+
+plt.title('Receiver Operating Characteristic')
+plt.plot(fpr, tpr, 'b', label = 'AUC = {:.2f}'.format(auc_metric))
+plt.legend(loc = 'lower right')
+plt.plot([0, 1], [0, 1],'r--')
+plt.xlim([0, 1])
+plt.ylim([0, 1.05])
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.show()
 # TODO Perform ROC analysis on the validation set
